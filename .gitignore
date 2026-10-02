@@ -2,3 +2,6 @@
 data.json
 data.json.tmp
 node_modules/
+data-eski.json
+.vercel
+.env*

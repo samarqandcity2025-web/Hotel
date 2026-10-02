@@ -227,24 +227,37 @@ function checkNewNotifs(){
 
 // ================== Server bilan aloqa ==================
 async function api(url,body){
-  const r=await fetch(url,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'1',...(token?{Authorization:'Bearer '+token}:{})},body:body?JSON.stringify(body):undefined});
-  if(r.status===401){logoutLocal();throw new Error('auth');}
-  return r.json();
+  const r=await fetch(url,{method:body?'POST':'GET',cache:'no-store',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:body?JSON.stringify(body):undefined});
+  if(r.status===401&&token){logoutLocal();throw new Error('auth');}
+  const j=await r.json().catch(()=>({error:'Server xatosi ('+r.status+')'}));
+  if(r.status>=500&&!j.error) j.error='Server xatosi';
+  return j;
 }
 function setState(st){S=st;skew=st.serverTime-Date.now();checkNewNotifs();syncPush();}
 function setOnline(v){online=v;const el=document.getElementById('conn');if(el){el.classList.toggle('off',!v);el.lastChild.textContent=v?' Onlayn':" Aloqa yo'q";}}
+let refreshing=false;
 async function refresh(){
-  try{setState(await api('/api/state'));setOnline(true);safeRender();}
-  catch(e){
+  if(refreshing||!token) return; refreshing=true;
+  try{
+    const r=await api('/api/state'+(S?'?v='+S.ver:''));
+    if(r.error) throw new Error(r.error);
+    setOnline(true);
+    if(!r.same){setState(r);safeRender();}
+  }catch(e){
     if(e.message==='auth') return;
     setOnline(false);
-    if(!S){
-      document.getElementById('root').innerHTML=`<div style="max-width:560px;margin:60px auto;padding:0 16px"><div class="panel"><div class="panel-head">Serverga ulanib bo'lmadi</div>
-        <div class="panel-body">Kompyuterda <code>start.bat</code> ishlab turganini tekshiring. Qayta urinilmoqda...</div></div></div>`;
-      setTimeout(refresh,4000);
-    }
-  }
+    if(!S) document.getElementById('root').innerHTML=`<div style="max-width:560px;margin:60px auto;padding:0 16px"><div class="panel"><div class="panel-head">Serverga ulanib bo'lmadi</div>
+        <div class="panel-body">Internet aloqasini tekshiring. Qayta urinilmoqda...<div class="hint" style="margin-top:6px">${esc(e.message)}</div></div></div></div>`;
+  }finally{refreshing=false;}
 }
+// Har necha soniyada yangilanish (ekran ochiq bo'lsa tez, yashirin bo'lsa kam)
+let pollTimer=null;
+function schedulePoll(){
+  clearTimeout(pollTimer);
+  if(!token) return;
+  pollTimer=setTimeout(async()=>{await refresh();schedulePoll();},document.hidden?60000:(S?6000:4000));
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&token){refresh();schedulePoll();}});
 async function act(type,data={}){
   try{
     const r=await api('/api/action',{type,...data});
@@ -253,13 +266,6 @@ async function act(type,data={}){
     if(r.msg) toast(r.msg,'ok',3000);
     render(); return true;
   }catch(e){if(e.message!=='auth')toast("Server bilan aloqa yo'q",'err');return false;}
-}
-function connect(){
-  if(es) es.close();
-  es=new EventSource('/api/events?token='+encodeURIComponent(token));
-  es.onmessage=()=>refresh();
-  es.onopen=()=>{setOnline(true);refresh();};
-  es.onerror=()=>setOnline(false);
 }
 // ================== Telefon bildirishnomalari (Web Push) ==================
 let swReg=null, pushSub=null, pushChecked=false, pushSynced=false, pushBusy=false;
@@ -323,7 +329,7 @@ function logoutLocal(){
   pushSynced=false;
   token=null;S=null;lastNotifId=null;section=null;
   try{localStorage.removeItem('pms_token');}catch(e){}
-  if(es){es.close();es=null;}
+  clearTimeout(pollTimer);
   renderLogin();
 }
 // Foydalanuvchi yozayotganda sahifani qayta chizmaslik
@@ -363,7 +369,7 @@ function renderLogin(){
       const r=await api('/api/login',{username:document.getElementById('lu').value.trim(),password:document.getElementById('lp').value});
       if(r.error){le.textContent=r.error;le.style.display='block';return;}
       token=r.token; try{localStorage.setItem('pms_token',token);}catch(e){}
-      await refresh(); connect();
+      await refresh(); schedulePoll();
     }catch(e){le.textContent="Server bilan aloqa yo'q";le.style.display='block';}
   };
   document.getElementById('lb').onclick=go;
@@ -372,8 +378,8 @@ function renderLogin(){
 function renderNoServer(){
   document.getElementById('root').innerHTML=`<div style="max-width:560px;margin:60px auto;padding:0 16px">
     <div class="panel"><div class="panel-head">Dastur server orqali ochilishi kerak</div>
-    <div class="panel-body">Hotel papkasidagi <code>start.bat</code> faylini ikki marta bosing, keyin brauzerda
-    <a href="http://localhost:3000">http://localhost:3000</a> manzilini oching.</div></div></div>`;
+    <div class="panel-body">Ilovani Vercel manzilidan oching (masalan <code>https://....vercel.app</code>).
+    Kompyuterda sinash uchun: <code>start.bat</code> → <a href="http://localhost:3000">http://localhost:3000</a></div></div></div>`;
 }
 
 // ================== Bo'limlar: administrator ==================
@@ -402,7 +408,7 @@ function renderDashboard(){
         const a=ot.find(t=>t.cleanerId===s.id&&(t.status==='tayinlandi'||t.status==='jarayonda'));
         const q=ot.filter(t=>t.cleanerId===s.id&&t.status==='navbatda').length;
         const st=s.active===false?pill('#8992a9','Ishda emas'):a?pill(TASK_COLOR[a.status],a.room+'-xona'):pill('#22c55e',"Bo'sh");
-        return `<div class="mini-row"><span>${esc(s.name)} ${s.tgLinked?'<span title="Telegram ulangan">📱</span>':''}${q?` <span class="muted">(+${q} navbat)</span>`:''}</span>${st}</div>`;
+        return `<div class="mini-row"><span>${esc(s.name)} ${s.pushCount?'<span title="Telefonga bildirishnoma yoqilgan">🔔</span>':''}${q?` <span class="muted">(+${q} navbat)</span>`:''}</span>${st}</div>`;
       }).join(''):`<div class="mini-row muted">Tozalovchi yo'q — «Xodimlar» bo'limidan qo'shing</div>`}
     </div></div>
   </div>`;
@@ -495,11 +501,7 @@ function renderInspect(){
 }
 
 // ================== Umumiy bo'limlar ==================
-function tgNotice(){
-  const me=S.me;
-  if(me.tgLinked||!S.settings.botUsername) return pushPanel();
-  return pushPanel()+`<div class="notice info">Telegram orqali ham olish mumkin (ixtiyoriy): <a href="https://t.me/${esc(S.settings.botUsername)}?start=${esc(me.tgCode)}" target="_blank" rel="noopener"><b>ulash</b></a></div>`;
-}
+const tgNotice=()=>pushPanel();
 function renderXabarlar(){
   const list=[...(S.notifications||[])].reverse();
   if(!readSent&&list.some(n=>!n.read)){readSent=true;setTimeout(()=>act('readAll'),1500);}
@@ -547,7 +549,7 @@ function renderStaff(){
     {label:'Rol',render:s=>esc(ROLE_LABEL[s.role]||s.role)},
     {label:'Qavatlar',render:s=>s.role==='tozalovchi'?((s.floors&&s.floors.length)?s.floors.join(', '):'Hammasi'):'—'},
     {label:'Holat',render:s=>s.active===false?pill('#8992a9','Ishda emas'):pill('#22c55e','Ishda')},
-    {label:'Telefon xabari',render:s=>(s.pushCount?pill('#22c55e','🔔 Yoqilgan'):pill('#ef4444','Yoqilmagan'))+(s.tgLinked?' '+pill('#3b82f6','Telegram'):'')+(S.settings.botUsername&&!s.tgLinked?` <button class="btn" data-copytg="${s.id}">Telegram havola</button>`:'')}],
+    {label:'Telefon xabari',render:s=>s.pushCount?pill('#22c55e','🔔 Yoqilgan'):pill('#ef4444','Yoqilmagan')}],
     S.staff,s=>{
       let h='';
       if(s.role==='tozalovchi') h+=`<button class="btn" data-floors="${s.id}">Qavat</button> `;
@@ -571,7 +573,7 @@ function renderStaff(){
 function renderSettings(){
   const st=S.settings;
   let hasOld=false; try{hasOld=!!localStorage.getItem('pms_rooms');}catch(e){}
-  return `<h1 class="page-title">Sozlamalar</h1><p class="page-sub">Vaqt chegaralari, Telegram va ulanish</p>
+  return `<h1 class="page-title">Sozlamalar</h1><p class="page-sub">Vaqt chegaralari va ilova manzili</p>
   <div class="panel"><div class="panel-head">Vaqt chegaralari (daqiqa)</div>
     <div class="form-grid">
       <div class="field"><label>Xabar kelgandan keyin boshlash</label><input id="st-start" type="number" min="1" value="${st.startLimit}"></div>
@@ -581,47 +583,21 @@ function renderSettings(){
     <div style="padding:0 18px 18px"><button class="btn primary" id="saveLimits">Saqlash</button>
       <span class="hint" style="margin-left:10px">Kalit topshirilgandan xona toza bo'lguncha: ${st.startLimit+st.cleanLimit} daq</span></div>
   </div>
-  <div class="panel"><div class="panel-head">🌍 Internet manzili (telefonlar uchun)
-      ${st.publicUrl?pill('#22c55e','Ishlayapti'):pill('#ef4444','Ulanmagan')}</div>
-    <div class="panel-body">
-      ${st.publicUrl?`Xodimlar telefonda shu manzilni ochadi va ilovani o'rnatadi:<br>
-        <code style="font-size:15px;display:inline-block;margin:8px 0">${esc(st.publicUrl)}</code>
-        <button class="btn" id="copyUrl">Nusxalash</button>
-        <div class="hint">Telefonga bildirishnoma faqat shu https manzil orqali ishlaydi.</div>`:
-        `Telefonlarga bildirishnoma kelishi uchun kompyuter internet manzilga (https) ulanishi kerak.
-        <code>tunnel-sozlash.txt</code> faylidagi ko'rsatmaga amal qiling, keyin <code>start.bat</code> ni qayta ishga tushiring.`}
-    </div>
-  </div>
-  <div class="panel"><div class="panel-head">📱 Telegram bildirishnomalari (ixtiyoriy)
-      ${st.botUsername?pill('#22c55e','@'+st.botUsername+' ulangan'):st.hasToken?pill('#ef4444',st.tgError||'Ulanmoqda...'):pill('#8992a9','Sozlanmagan')}</div>
-    <div class="panel-body">
-      <ol style="margin:0 0 14px;padding-left:18px">
-        <li>Telegramda <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> ni oching → <code>/newbot</code> → botga nom bering.</li>
-        <li>BotFather bergan <b>token</b>ni pastga qo'yib, «Saqlash»ni bosing.</li>
-        <li>Har bir xodim o'z telefonidan dasturga kirib, «Profil»dagi havolani bosadi (yoki «Xodimlar»dan havolani nusxalab, xodimga yuboring).</li>
-      </ol>
-    </div>
-    <div class="form-grid" style="padding-top:0">
-      <div class="field"><label>Bot token</label><input id="st-token" value="${esc(st.telegramToken||'')}" placeholder="123456789:AA..."></div>
-      <div class="field" style="display:flex;align-items:flex-end;gap:8px"><button class="btn primary" id="saveToken">Saqlash</button><button class="btn" id="tgTest">Sinov xabari</button></div>
-    </div>
-  </div>
-  <div class="panel"><div class="panel-head">🌐 Telefonlardan ulanish</div>
-    <div class="panel-body">Xodimlar telefonlari shu Wi-Fi tarmog'ida bo'lsa, brauzerda quyidagi manzilni ochadi:<br>
-      ${(st.lanUrls||[]).map(u=>`<code style="font-size:14px">${esc(u)}</code>`).join(' ')||'<span class="muted">Tarmoq topilmadi</span>'}
-      <div class="hint" style="margin-top:8px">Server kompyuterda doim yoqilgan turishi kerak (start.bat).</div>
+  <div class="panel"><div class="panel-head">🌍 Ilova manzili (xodimlar uchun)</div>
+    <div class="panel-body">Xodimlar telefonda shu manzilni ochadi, kiradi va «🔔 Bildirishnomalarni yoqish»ni bosadi:<br>
+      <code style="font-size:15px;display:inline-block;margin:8px 0">${esc(location.origin)}</code>
+      <button class="btn" id="copyUrl">Nusxalash</button>
+      ${location.protocol!=='https:'?'<div class="notice warn" style="margin-top:10px">Bu sinov manzili. Telefon bildirishnomalari faqat https:// (Vercel) manzilda ishlaydi.</div>':''}
     </div>
   </div>
   ${hasOld?`<div class="panel"><div class="panel-head">Eski ma'lumotlar</div><div class="panel-body">Bu brauzerda eski versiyadan qolgan xona va xodimlar bor. Ularni serverga ko'chirish mumkin.
     <div style="margin-top:10px"><button class="btn primary" id="importOld">Import qilish</button></div></div></div>`:''}`;
 }
 function renderProfile(){
-  const u=S.me, st=S.settings;
-  const tgLink=st.botUsername?`https://t.me/${st.botUsername}?start=${u.tgCode}`:'';
+  const u=S.me;
   return `<h1 class="page-title">Mening profilim</h1><p class="page-sub">${esc(ROLE_LABEL[u.role]||u.role)}</p>
   <div class="panel"><div class="panel-head">🔔 Telefonga bildirishnomalar ${u.pushCount?pill('#22c55e',u.pushCount+' ta qurilma'):''}</div><div class="panel-body">
     ${pushPanel()||'<span class="muted">—</span>'}
-    ${tgLink?`<div class="hint" style="margin-top:6px">Telegram (ixtiyoriy): ${u.tgLinked?'ulangan':`<a href="${esc(tgLink)}" target="_blank" rel="noopener">ulash</a>`}</div>`:''}
   </div></div>
   <div class="panel"><div class="form-grid">
     <div class="field"><label>Ism</label><input id="pf-name" value="${esc(u.name)}"></div>
@@ -722,17 +698,11 @@ function wire(){
   on('toggle',id=>{const s=S.staff.find(x=>x.id===+id);act('updateStaff',{id:+id,active:s.active===false});});
   on('resetpass',id=>{const v=prompt('Yangi parol:','');if(v&&v.trim())act('updateStaff',{id:+id,password:v.trim()});});
   on('rmstaff',id=>{const s=S.staff.find(x=>x.id===+id);if(confirm(s.name+"ni o'chirmoqchimisiz?"))act('deleteStaff',{id:+id});});
-  on('copytg',id=>{
-    const s=S.staff.find(x=>x.id===+id), link=`https://t.me/${S.settings.botUsername}?start=${s.tgCode}`;
-    (navigator.clipboard?navigator.clipboard.writeText(link):Promise.reject()).then(()=>toast('Havola nusxalandi — xodimga yuboring','ok')).catch(()=>prompt('Havolani nusxalang:',link));
-  });
   if($('addStaffBtn')) $('addStaffBtn').onclick=()=>act('addStaff',{name:$('ns-name').value,role:$('ns-role').value,username:$('ns-user').value,password:$('ns-pass').value,phone:$('ns-phone').value,floors:parseFloors($('ns-floors').value)});
 
   // sozlamalar
   if($('saveLimits')) $('saveLimits').onclick=()=>act('settings',{startLimit:+$('st-start').value,cleanLimit:+$('st-clean').value,inspectLimit:+$('st-insp').value});
-  if($('saveToken')) $('saveToken').onclick=()=>act('settings',{telegramToken:$('st-token').value.trim()});
-  if($('tgTest')) $('tgTest').onclick=()=>act('tgTest');
-  if($('copyUrl')) $('copyUrl').onclick=()=>{const u=S.settings.publicUrl;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>toast('Manzil nusxalandi — xodimlarga yuboring','ok')).catch(()=>prompt('Manzilni nusxalang:',u));};
+  if($('copyUrl')) $('copyUrl').onclick=()=>{const u=location.origin;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>toast('Manzil nusxalandi — xodimlarga yuboring','ok')).catch(()=>prompt('Manzilni nusxalang:',u));};
   if($('importOld')) $('importOld').onclick=async()=>{
     const g=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}};
     const ok=await act('import',{rooms:g('pms_rooms'),floors:g('pms_floors'),staff:(g('pms_staff')||[]).map(s=>({...s,role:s.role})),history:g('pms_history')});
@@ -747,7 +717,7 @@ function wire(){
 if(location.protocol==='file:') renderNoServer();
 else{
   initPush();
-  if(token){ refresh().then(()=>{ if(token) connect(); }); }
+  if(token){ refresh().then(schedulePoll); }
   else renderLogin();
 }
 </script>

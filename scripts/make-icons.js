@@ -49,5 +49,5 @@ function render(size) {
   });
 }
 for (const [name, size] of [['icon-192.png', 192], ['icon-512.png', 512], ['apple-touch-icon.png', 180]])
-  fs.writeFileSync(path.join(__dirname, name), render(size));
+  fs.writeFileSync(path.join(__dirname, '..', 'public', name), render(size));
 console.log('Ikonkalar yaratildi');
