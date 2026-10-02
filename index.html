@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0f1e">
+<title>Mehmonxona — Xonalarni boshqarish</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --bg:#0d1526; --sidebar:#0a0f1e; --panel:#131b2e; --panel2:#0f1728; --border:#232d42;
+  --text:#e7ebf3; --muted:#8992a9; --accent:#3b82f6; --green:#22c55e; --red:#ef4444; --amber:#f59e0b;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100%;}
+button,input,select{font-family:'Inter',sans-serif}
+::-webkit-scrollbar{width:8px;height:8px} ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+
+.login-screen{display:flex;min-height:100vh}
+.login-hero{flex:1;background:linear-gradient(160deg,#0a0f1e,#16213a 70%);display:flex;flex-direction:column;justify-content:flex-end;padding:56px;position:relative;overflow:hidden}
+.login-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 30% 20%,#3b82f633,transparent 60%)}
+.login-hero .crown{font-size:13px;letter-spacing:4px;color:var(--accent);font-weight:600;margin-bottom:10px;position:relative}
+.login-hero h1{font-size:26px;margin:0 0 8px;position:relative;letter-spacing:.3px}
+.login-hero p{color:var(--muted);font-size:14px;margin:0;position:relative}
+.login-formside{flex:1;background:#f5f6f8;display:flex;align-items:center;justify-content:center;padding:24px}
+.login-card{width:100%;max-width:360px}
+.login-card h2{color:#0d1526;font-size:24px;margin:0 0 6px}
+.login-card p.sub{color:#667;font-size:13.5px;margin:0 0 26px}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12.5px;color:#445;margin-bottom:6px;font-weight:500}
+.field input{width:100%;padding:11px 13px;border-radius:9px;border:1px solid #dde1e8;background:#fff;color:#0d1526;font-size:14px}
+.pass-wrap{position:relative}
+.pass-wrap input{padding-right:40px}
+.pass-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#8992a9;padding:6px;display:flex}
+.login-btn{width:100%;padding:12px;border-radius:9px;border:none;background:var(--accent);color:#fff;font-weight:600;font-size:14.5px;cursor:pointer}
+.login-err{color:var(--red);font-size:12.5px;margin-top:8px}
+
+.app{display:flex;min-height:100vh}
+.sidebar{width:212px;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh}
+.sb-brand{padding:22px 20px;font-weight:700;font-size:15px;border-bottom:1px solid var(--border);letter-spacing:.3px}
+.sb-nav{flex:1;overflow-y:auto;padding:10px}
+.sb-item{display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;background:none;border:none;color:var(--muted);padding:10px 14px;border-radius:8px;font-size:13.5px;cursor:pointer;margin-bottom:2px}
+.sb-item:hover{background:#151f36;color:var(--text)}
+.sb-item.active{background:var(--accent);color:#fff;font-weight:500}
+.sb-count{background:var(--red);color:#fff;border-radius:10px;font-size:11px;font-weight:700;padding:1px 7px}
+.sb-logout{margin:10px;padding:11px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--muted);font-size:13px;cursor:pointer}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{height:64px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 26px;position:sticky;top:0;background:var(--bg);z-index:5}
+.topbar-right{display:flex;align-items:center;gap:16px;font-size:13px;color:var(--muted)}
+.conn{font-size:12px;display:flex;align-items:center;gap:6px;color:var(--muted)}
+.conn i{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block}
+.conn.off i{background:var(--red)}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px}
+.content{padding:26px;overflow-y:auto}
+h1.page-title{font-size:19px;margin:0 0 4px}
+p.page-sub{color:var(--muted);font-size:13px;margin:0 0 22px}
+
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+.stat-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+.stat-card .lbl{font-size:12px;color:var(--muted);margin-bottom:8px}
+.stat-card .val{font-size:22px;font-weight:700}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px}
+.panel-head{padding:14px 18px;border-bottom:1px solid var(--border);font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.panel-body{padding:16px 18px;font-size:13.5px;line-height:1.6}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 16px;color:var(--muted);font-weight:500;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:12px 16px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+.badge{padding:4px 10px;border-radius:20px;font-size:11.5px;font-weight:600;white-space:nowrap;display:inline-block}
+.btn{padding:8px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:12.5px;cursor:pointer;margin:2px 0;white-space:nowrap}
+.btn:hover{border-color:#3a4766}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.green{background:var(--green);border-color:var(--green);color:#fff}
+.btn.red{border-color:#ef444466;color:#f87171}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.grid2{display:grid;grid-template-columns:2fr 1fr;gap:18px}
+.mini-list{padding:6px 0}
+.mini-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 18px;font-size:13px;border-bottom:1px solid var(--border)}
+.mini-row:last-child{border-bottom:none}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:18px}
+.form-grid .field{margin-bottom:0}
+.form-grid .field input, .form-grid .field select{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:13px}
+.form-grid .field label{color:var(--muted)}
+.search{width:100%;max-width:320px;padding:9px 14px;border-radius:8px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:13px;margin-bottom:14px}
+.muted{color:var(--muted)}
+.timer{font-variant-numeric:tabular-nums;font-weight:600}
+.timer.late{color:var(--red)}
+.hint{font-size:12px;color:var(--muted)}
+code{background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:12.5px}
+a{color:#60a5fa}
+
+/* xodim uchun katta vazifa kartasi */
+.task-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:24px;text-align:center;margin-bottom:18px}
+.task-card .room{font-size:56px;font-weight:700;line-height:1;margin:8px 0}
+.task-card .big-timer{font-size:38px;font-weight:700;font-variant-numeric:tabular-nums;margin:12px 0 4px}
+.task-card .big-timer.late{color:var(--red)}
+.task-card .big-btn{width:100%;max-width:340px;padding:18px;border-radius:12px;border:none;font-size:18px;font-weight:700;color:#fff;cursor:pointer;margin-top:16px}
+.notice{border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:16px;border:1px solid}
+.notice.warn{background:#f59e0b14;border-color:#f59e0b55;color:#fbbf24}
+.notice.info{background:#3b82f614;border-color:#3b82f655;color:#93c5fd}
+
+/* toast */
+#toasts{position:fixed;right:16px;bottom:16px;z-index:100;display:flex;flex-direction:column;gap:8px;max-width:min(380px,calc(100vw - 32px))}
+.toast{background:#1c2740;border:1px solid var(--border);border-left:4px solid var(--accent);padding:12px 14px;border-radius:10px;font-size:13px;box-shadow:0 8px 24px #0006;white-space:pre-line;animation:tin .2s}
+.toast.warn,.toast.err{border-left-color:var(--red)}
+.toast.ok{border-left-color:var(--green)}
+@keyframes tin{from{transform:translateY(10px);opacity:0}}
+
+.menu-toggle{display:none;background:none;border:none;color:var(--text);cursor:pointer;padding:6px;margin-right:8px;font-size:20px;line-height:1}
+.sidebar-backdrop{display:none;position:fixed;inset:0;background:#0007;z-index:40}
+.sidebar-backdrop.show{display:block}
+@media(max-width:900px){
+  .login-hero{display:none} .stat-row{grid-template-columns:repeat(2,1fr)} .grid2{grid-template-columns:1fr} .form-grid{grid-template-columns:1fr}
+  .sidebar{position:fixed;left:0;top:0;height:100vh;transform:translateX(-100%);transition:transform .25s;z-index:50}
+  .sidebar.open{transform:translateX(0)}
+  .menu-toggle{display:flex;align-items:center}
+  .content{padding:16px}
+  .topbar{padding:0 16px}
+  .topbar-right .uname{display:none}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="toasts"></div>
+
+<script>
+// ================== Holat ==================
+let token=null; try{token=localStorage.getItem('pms_token');}catch(e){}
+let S=null, section=null, skew=0, es=null, lastNotifId=null, pendingRender=false, online=true, readSent=false;
+const now=()=>Date.now()+skew;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const MIN=60000;
+
+const ROOM_COLOR={bosh:'#22c55e',band:'#3b82f6',tozalash:'#f59e0b',tozalanmoqda:'#a855f7',tekshiruv:'#06b6d4'};
+const ROOM_LABEL={bosh:"Bo'sh",band:'Band',tozalash:'Tozalash kerak',tozalanmoqda:'Tozalanmoqda',tekshiruv:'Tekshiruvda'};
+const TASK_COLOR={navbatda:'#8992a9',tayinlandi:'#f59e0b',jarayonda:'#a855f7',tekshiruvda:'#06b6d4',qabul:'#22c55e',bekor:'#8992a9'};
+const TASK_LABEL={navbatda:'Navbatda',tayinlandi:'Boshlashni kutmoqda',jarayonda:'Tozalanmoqda',tekshiruvda:'Tekshiruvda',qabul:'Qabul qilindi',bekor:'Bekor qilindi'};
+const ROLE_LABEL={boshqaruv:'Administrator',tozalovchi:'Tozalovchi',nazoratchi:'Nazoratchi'};
+const OPEN=['navbatda','tayinlandi','jarayonda','tekshiruvda'];
+
+const pill=(c,l)=>`<span class="badge" style="background:${c}22;color:${c}">${esc(l)}</span>`;
+const roomBadge=r=>pill(ROOM_COLOR[r.status]||'#8992a9',ROOM_LABEL[r.status]||r.status);
+const taskBadge=t=>pill(TASK_COLOR[t.status]||'#8992a9',TASK_LABEL[t.status]||t.status);
+const lateBadges=t=>(t.lateStart?' '+pill('#ef4444','Kech boshladi'):'')+(t.lateFinish?' '+pill('#ef4444','Vaqtdan oshdi'):'')+(t.rework?' '+pill('#f59e0b','Qayta: '+t.rework):'');
+const staffName=id=>(S.staff.find(s=>s.id===id)||{}).name||'—';
+const openTasks=()=>S.tasks.filter(t=>OPEN.includes(t.status));
+const fmtTime=ts=>new Date(ts).toLocaleString('uz-UZ',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+
+function fmtLeft(ms){
+  const a=Math.abs(ms), m=Math.floor(a/MIN), s=Math.floor(a%MIN/1000);
+  const t=`${m}:${String(s).padStart(2,'0')}`;
+  return ms<0?`+${t} kechikdi`:t;
+}
+// Vazifa uchun keyingi muddat
+function taskDeadline(t){
+  if(t.status==='tayinlandi') return {until:t.startDeadline,label:'Boshlashgacha'};
+  if(t.status==='jarayonda') return {until:t.startedAt+S.settings.cleanLimit*MIN,label:'Tugatishgacha'};
+  if(t.status==='tekshiruvda') return {until:t.finishedAt+S.settings.inspectLimit*MIN,label:'Tekshiruvgacha'};
+  return null;
+}
+function timerHtml(t){
+  const d=taskDeadline(t); if(!d) return '<span class="muted">—</span>';
+  return `<span class="muted" style="font-size:11.5px">${d.label}:</span> <span class="timer" data-until="${d.until}">${fmtLeft(d.until-now())}</span>`;
+}
+setInterval(()=>{
+  document.querySelectorAll('[data-until]').forEach(el=>{const d=Number(el.dataset.until)-now();el.textContent=fmtLeft(d);el.classList.toggle('late',d<0);});
+},1000);
+
+function table(cols,rows,rowAction,empty="Ma'lumot yo'q"){
+  let h='<div class="table-wrap"><table><thead><tr>'+cols.map(c=>`<th>${c.label}</th>`).join('')+(rowAction?'<th></th>':'')+'</tr></thead><tbody>';
+  if(rows.length===0) h+=`<tr><td colspan="${cols.length+1}" style="text-align:center;color:var(--muted);padding:30px">${empty}</td></tr>`;
+  rows.forEach(r=>{
+    h+='<tr>'+cols.map(c=>`<td>${c.render?c.render(r):esc(r[c.key]??'—')}</td>`).join('');
+    if(rowAction) h+=`<td style="white-space:nowrap">${rowAction(r)}</td>`;
+    h+='</tr>';
+  });
+  return h+'</tbody></table></div>';
+}
+function wireSearch(inputId,panelSel){
+  const inp=document.getElementById(inputId); if(!inp) return;
+  inp.addEventListener('input',()=>{
+    const q=inp.value.toLowerCase();
+    document.querySelectorAll(panelSel+' tbody tr').forEach(tr=>{tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none';});
+  });
+}
+
+// ================== Ovoz va xabarlar ==================
+let audioCtx=null;
+function beep(times=2){
+  try{
+    audioCtx=audioCtx||new(window.AudioContext||window.webkitAudioContext)();
+    for(let i=0;i<times;i++){
+      const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);
+      o.frequency.value=i%2?660:880;g.gain.value=0.08;const t=audioCtx.currentTime+i*0.25;o.start(t);o.stop(t+0.18);
+    }
+  }catch(e){}
+}
+document.addEventListener('click',()=>{try{audioCtx=audioCtx||new(window.AudioContext||window.webkitAudioContext)();audioCtx.resume();}catch(e){}},{once:true});
+function toast(text,kind='info',ms=5000){
+  const el=document.createElement('div'); el.className='toast '+kind; el.textContent=text;
+  document.getElementById('toasts').appendChild(el); setTimeout(()=>el.remove(),ms);
+}
+function checkNewNotifs(){
+  const list=S.notifications||[]; const max=list.reduce((m,n)=>Math.max(m,n.id),0);
+  if(lastNotifId===null){lastNotifId=max;return;}
+  const fresh=list.filter(n=>n.id>lastNotifId); lastNotifId=Math.max(lastNotifId,max);
+  if(!fresh.length) return;
+  readSent=false;
+  fresh.forEach(n=>{
+    toast(n.text,n.level==='warn'?'warn':'info',9000);
+    try{ if(window.Notification&&Notification.permission==='granted'&&document.hidden) new Notification('Mehmonxona',{body:n.text}); }catch(e){}
+  });
+  beep(fresh.some(n=>n.level==='warn')?4:2);
+  try{navigator.vibrate&&navigator.vibrate([300,150,300]);}catch(e){}
+}
+
+// ================== Server bilan aloqa ==================
+async function api(url,body){
+  const r=await fetch(url,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:body?JSON.stringify(body):undefined});
+  if(r.status===401){logoutLocal();throw new Error('auth');}
+  return r.json();
+}
+function setState(st){S=st;skew=st.serverTime-Date.now();checkNewNotifs();}
+function setOnline(v){online=v;const el=document.getElementById('conn');if(el){el.classList.toggle('off',!v);el.lastChild.textContent=v?' Onlayn':" Aloqa yo'q";}}
+async function refresh(){
+  try{setState(await api('/api/state'));setOnline(true);safeRender();}
+  catch(e){
+    if(e.message==='auth') return;
+    setOnline(false);
+    if(!S){
+      document.getElementById('root').innerHTML=`<div style="max-width:560px;margin:60px auto;padding:0 16px"><div class="panel"><div class="panel-head">Serverga ulanib bo'lmadi</div>
+        <div class="panel-body">Kompyuterda <code>start.bat</code> ishlab turganini tekshiring. Qayta urinilmoqda...</div></div></div>`;
+      setTimeout(refresh,4000);
+    }
+  }
+}
+async function act(type,data={}){
+  try{
+    const r=await api('/api/action',{type,...data});
+    if(r.error){toast(r.error,'err');return false;}
+    if(r.state) setState(r.state);
+    if(r.msg) toast(r.msg,'ok',3000);
+    render(); return true;
+  }catch(e){if(e.message!=='auth')toast("Server bilan aloqa yo'q",'err');return false;}
+}
+function connect(){
+  if(es) es.close();
+  es=new EventSource('/api/events?token='+encodeURIComponent(token));
+  es.onmessage=()=>refresh();
+  es.onopen=()=>{setOnline(true);refresh();};
+  es.onerror=()=>setOnline(false);
+}
+function logoutLocal(){
+  token=null;S=null;lastNotifId=null;section=null;
+  try{localStorage.removeItem('pms_token');}catch(e){}
+  if(es){es.close();es=null;}
+  renderLogin();
+}
+// Foydalanuvchi yozayotganda sahifani qayta chizmaslik
+function safeRender(){
+  const a=document.activeElement;
+  if(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)&&a.closest('.content')){pendingRender=true;return;}
+  render();
+}
+document.addEventListener('focusout',()=>{if(pendingRender)setTimeout(()=>{if(pendingRender){pendingRender=false;safeRender();}},150);});
+
+// ================== Kirish ==================
+function renderLogin(){
+  document.getElementById('root').innerHTML=`
+  <div class="login-screen">
+    <div class="login-hero">
+      <div class="crown">MEHMONXONA</div>
+      <h1>Xonalarni boshqarish tizimi</h1>
+      <p>Yaxshiroq boshqaruv. Toza xonalar. Baxtli mehmonlar.</p>
+    </div>
+    <div class="login-formside">
+      <div class="login-card">
+        <h2>Xush kelibsiz</h2>
+        <p class="sub">Xizmat hisobingizga kiring</p>
+        <div class="field"><label>Login</label><input id="lu" type="text" placeholder="Login" autocomplete="username"></div>
+        <div class="field pass-wrap"><label>Parol</label><input id="lp" type="password" placeholder="Parol" autocomplete="current-password">
+          <button type="button" class="pass-toggle" id="pt"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </div>
+        <button class="login-btn" id="lb">Kirish</button>
+        <div class="login-err" id="le" style="display:none"></div>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('pt').onclick=()=>{const i=document.getElementById('lp');i.type=i.type==='password'?'text':'password';};
+  const go=async()=>{
+    const le=document.getElementById('le');
+    try{
+      const r=await api('/api/login',{username:document.getElementById('lu').value.trim(),password:document.getElementById('lp').value});
+      if(r.error){le.textContent=r.error;le.style.display='block';return;}
+      token=r.token; try{localStorage.setItem('pms_token',token);}catch(e){}
+      await refresh(); connect();
+    }catch(e){le.textContent="Server bilan aloqa yo'q";le.style.display='block';}
+  };
+  document.getElementById('lb').onclick=go;
+  document.getElementById('lp').addEventListener('keydown',e=>{if(e.key==='Enter')go();});
+}
+function renderNoServer(){
+  document.getElementById('root').innerHTML=`<div style="max-width:560px;margin:60px auto;padding:0 16px">
+    <div class="panel"><div class="panel-head">Dastur server orqali ochilishi kerak</div>
+    <div class="panel-body">Hotel papkasidagi <code>start.bat</code> faylini ikki marta bosing, keyin brauzerda
+    <a href="http://localhost:3000">http://localhost:3000</a> manzilini oching.</div></div></div>`;
+}
+
+// ================== Bo'limlar: administrator ==================
+function renderDashboard(){
+  const R=S.rooms, c=st=>R.filter(r=>r.status===st).length;
+  const ot=openTasks(), alerts=(S.notifications||[]).filter(n=>n.level==='warn'&&!n.read).slice(-6).reverse();
+  const cl=S.staff.filter(s=>s.role==='tozalovchi');
+  return `
+  <h1 class="page-title">Xayrli kun!</h1><p class="page-sub">Bugungi xonalar holati — jonli</p>
+  <div class="stat-row">
+    <div class="stat-card"><div class="lbl">Jami xonalar</div><div class="val">${R.length}</div></div>
+    <div class="stat-card"><div class="lbl">Bo'sh</div><div class="val" style="color:#22c55e">${c('bosh')}</div></div>
+    <div class="stat-card"><div class="lbl">Band</div><div class="val" style="color:#3b82f6">${c('band')}</div></div>
+    <div class="stat-card"><div class="lbl">Tozalash jarayonida</div><div class="val" style="color:#f59e0b">${c('tozalash')+c('tozalanmoqda')+c('tekshiruv')}</div></div>
+  </div>
+  ${alerts.length?`<div class="panel" style="border-color:#ef444466"><div class="panel-head" style="color:#f87171">🚨 Ogohlantirishlar <button class="btn" data-nav="xabarlar">Hammasi</button></div><div class="mini-list">
+    ${alerts.map(n=>`<div class="mini-row"><span>${esc(n.text)}</span><span class="muted" style="font-size:12px;white-space:nowrap">${fmtTime(n.ts)}</span></div>`).join('')}</div></div>`:''}
+  <div class="grid2">
+    <div class="panel"><div class="panel-head">Tozalash jarayoni</div>
+      ${table([{label:'Xona',render:t=>`<b>${t.room}</b>`},{label:'Holat',render:t=>taskBadge(t)+lateBadges(t)},
+        {label:'Tozalovchi',render:t=>esc(t.cleanerId?staffName(t.cleanerId):'Belgilanmagan')},{label:'Taymer',render:timerHtml}],ot,null,"Hammasi toza — kutayotgan xona yo'q")}
+    </div>
+    <div class="panel"><div class="panel-head">Tozalovchilar</div><div class="mini-list">
+      ${cl.length?cl.map(s=>{
+        const a=ot.find(t=>t.cleanerId===s.id&&(t.status==='tayinlandi'||t.status==='jarayonda'));
+        const q=ot.filter(t=>t.cleanerId===s.id&&t.status==='navbatda').length;
+        const st=s.active===false?pill('#8992a9','Ishda emas'):a?pill(TASK_COLOR[a.status],a.room+'-xona'):pill('#22c55e',"Bo'sh");
+        return `<div class="mini-row"><span>${esc(s.name)} ${s.tgLinked?'<span title="Telegram ulangan">📱</span>':''}${q?` <span class="muted">(+${q} navbat)</span>`:''}</span>${st}</div>`;
+      }).join(''):`<div class="mini-row muted">Tozalovchi yo'q — «Xodimlar» bo'limidan qo'shing</div>`}
+    </div></div>
+  </div>`;
+}
+function renderRooms(){
+  const ot=openTasks();
+  const blocks=S.floors.map(f=>{
+    const fr=S.rooms.filter(r=>r.floor===f).sort((a,b)=>a.num-b.num);
+    return `<div class="panel"><div class="panel-head">${f}-qavat <button class="btn red" data-rmfloor="${f}">Qavatni o'chirish</button></div>
+      ${table([{label:'Xona',render:r=>`<b>${r.num}</b>`},{key:'type',label:'Turi'},{label:'Holat',render:r=>roomBadge(r)},
+        {label:'Mehmon / Mas’ul',render:r=>r.status==='band'?esc(r.guest||'—'):(()=>{const t=ot.find(x=>x.room===r.num);return t&&t.cleanerId?'🧹 '+esc(staffName(t.cleanerId)):'—';})()},
+        {label:'Izoh',render:r=>esc(r.note||'—')}],fr,r=>{
+          let h='';
+          if(r.status==='band') h+=`<button class="btn primary" data-checkout="${r.num}" title="Mehmon chiqib, kalitni topshirdi">🔑 Kalit topshirildi</button> `;
+          if(r.status==='bosh') h+=`<button class="btn" data-checkin="${r.num}">Joylashtirish</button> <button class="btn" data-needclean="${r.num}">Tozalashga</button> `;
+          return h+`<button class="btn" data-note="${r.num}">Izoh</button> <button class="btn" data-editroom="${r.num}">Tahrirlash</button> <button class="btn red" data-rmroom="${r.num}">O'chirish</button>`;
+        },"Xona yo'q")}
+    </div>`;
+  }).join('');
+  return `<h1 class="page-title">Xonalar</h1><p class="page-sub">Mehmon kalitni topshirganda «🔑 Kalit topshirildi» ni bosing — tozalovchiga avtomatik xabar boradi</p>
+  <input id="roomsSearch" class="search" placeholder="Qidirish: xona, mehmon...">
+  <div id="roomsPanel">${blocks||`<div class="panel"><div class="panel-body muted">Hali qavat yo'q — pastdan qo'shing</div></div>`}</div>
+  <div class="panel"><div class="panel-head">Qavatlar va xonalar</div>
+    <div class="form-grid">
+      <div class="field"><label>Yangi qavat raqami</label><input id="nf-num" type="number" placeholder="3"></div>
+      <div class="field" style="display:flex;align-items:flex-end"><button class="btn primary" id="addFloorBtn">+ Qavat qo'shish</button></div>
+    </div>
+    <div class="form-grid" style="border-top:1px solid var(--border)">
+      <div class="field"><label>Xona raqami</label><input id="nr-num" type="number" placeholder="105"></div>
+      <div class="field"><label>Turi</label><input id="nr-type" placeholder="Standart"></div>
+      <div class="field"><label>Qavat</label><select id="nr-floor">${S.floors.map(f=>`<option value="${f}">${f}-qavat</option>`).join('')}</select></div>
+      <div class="field" style="display:flex;align-items:flex-end"><button class="btn primary" id="addRoomBtn"${S.floors.length?'':' disabled'}>+ Xona qo'shish</button></div>
+    </div>
+  </div>`;
+}
+function renderHousekeeping(){
+  const me=S.me, admin=me.role==='boshqaruv';
+  const ot=openTasks().sort((a,b)=>a.createdAt-b.createdAt);
+  return `<h1 class="page-title">Tozalash</h1><p class="page-sub">Barcha ochiq vazifalar. Boshlash: ${S.settings.startLimit} daq · Tozalash: ${S.settings.cleanLimit} daq · Tekshiruv: ${S.settings.inspectLimit} daq</p>
+  <div class="panel">${table([
+    {label:'Xona',render:t=>`<b>${t.room}</b> <span class="muted">${t.floor}-qavat</span>`},
+    {label:'Holat',render:t=>taskBadge(t)+lateBadges(t)},
+    {label:'Tozalovchi',render:t=>esc(t.cleanerId?staffName(t.cleanerId):'Belgilanmagan')},
+    {label:'Nazoratchi',render:t=>esc(t.inspectorId?staffName(t.inspectorId):'—')},
+    {label:'Taymer',render:timerHtml}],ot,admin?(t=>{
+      let h='';
+      if(t.status==='navbatda'||t.status==='tayinlandi') h+=`<button class="btn" data-reassign="${t.id}">Boshqaga berish</button> `;
+      if(t.status==='tekshiruvda') h+=`<button class="btn green" data-inspok="${t.id}">✅ Qabul</button> <button class="btn red" data-insprej="${t.id}">❌ Qaytarish</button> `;
+      return h+`<button class="btn red" data-cancel="${t.id}" title="Vazifani yopib, xonani bo'sh deb belgilash">Bekor</button>`;
+    }):null,"Hammasi toza — ochiq vazifa yo'q")}</div>`;
+}
+
+// ================== Bo'limlar: tozalovchi ==================
+function renderMyTask(){
+  const me=S.me, mine=openTasks().filter(t=>t.cleanerId===me.id);
+  const cur=mine.find(t=>t.status==='tayinlandi'||t.status==='jarayonda');
+  const queue=mine.filter(t=>t.status==='navbatda');
+  let card;
+  if(cur){
+    const d=taskDeadline(cur), isStart=cur.status==='tayinlandi';
+    card=`<div class="task-card">
+      ${taskBadge(cur)}${lateBadges(cur)}
+      <div class="room">${cur.room}</div><div class="muted">${cur.floor}-qavat · ${esc((S.rooms.find(r=>r.num===cur.room)||{}).type||'')}</div>
+      ${cur.rework?`<div class="notice warn" style="margin-top:12px">Qayta tozalash: ${esc(cur.reason)}</div>`:''}
+      ${(S.rooms.find(r=>r.num===cur.room)||{}).note?`<div class="notice info" style="margin-top:12px">Izoh: ${esc(S.rooms.find(r=>r.num===cur.room).note)}</div>`:''}
+      <div class="muted" style="margin-top:14px">${d.label}</div>
+      <div class="big-timer" data-until="${d.until}">${fmtLeft(d.until-now())}</div>
+      <button class="big-btn" style="background:${isStart?'var(--accent)':'var(--green)'}" data-${isStart?'start':'finish'}="${cur.id}">${isStart?'▶️ Boshladim':'🏁 Tugatdim'}</button>
+    </div>`;
+  } else card=`<div class="task-card"><div style="font-size:42px">☕</div><h2 style="margin:8px 0 4px">Hozir vazifa yo'q</h2><div class="muted">Yangi xona bo'lsa, shu yerda va telefoningizda xabar chiqadi</div></div>`;
+  return `<h1 class="page-title">Mening vazifam</h1><p class="page-sub">Xabar kelgach ${S.settings.startLimit} daqiqa ichida boshlang, ${S.settings.cleanLimit} daqiqada tugating</p>
+  ${tgNotice()}${card}
+  ${queue.length?`<div class="panel"><div class="panel-head">Navbatda (${queue.length})</div><div class="mini-list">${queue.map(t=>`<div class="mini-row"><span>${t.room}-xona · ${t.floor}-qavat</span>${t.priority?pill('#f59e0b','Birinchi'):''}</div>`).join('')}</div></div>`:''}`;
+}
+
+// ================== Bo'limlar: nazoratchi ==================
+function renderInspect(){
+  const me=S.me, list=openTasks().filter(t=>t.status==='tekshiruvda').sort((a,b)=>(b.inspectorId===me.id)-(a.inspectorId===me.id)||a.finishedAt-b.finishedAt);
+  const cards=list.map(t=>`<div class="task-card" style="text-align:left;padding:18px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <div><span style="font-size:28px;font-weight:700">${t.room}</span> <span class="muted">${t.floor}-qavat</span></div>
+        <div>${t.inspectorId===me.id?pill('#3b82f6','Sizga'):''} ${timerHtml(t)}</div>
+      </div>
+      <div class="muted" style="margin:8px 0 12px">Tozaladi: ${esc(staffName(t.cleanerId))} · ${Math.round((t.finishedAt-t.startedAt)/MIN)} daqiqada${t.rework?' · '+t.rework+'-marta qayta':''}</div>
+      <button class="btn green" style="padding:12px 20px;font-size:14px" data-inspok="${t.id}">✅ Qabul qilish</button>
+      <button class="btn red" style="padding:12px 20px;font-size:14px" data-insprej="${t.id}">❌ Qaytarish</button>
+    </div>`).join('');
+  return `<h1 class="page-title">Tekshiruv</h1><p class="page-sub">Tozalangan xonalarni borib tekshiring</p>${tgNotice()}
+  ${cards||`<div class="task-card"><div style="font-size:42px">✅</div><h2 style="margin:8px 0 4px">Tekshiradigan xona yo'q</h2></div>`}`;
+}
+
+// ================== Umumiy bo'limlar ==================
+function tgNotice(){
+  const me=S.me;
+  if(me.tgLinked) return '';
+  if(!S.settings.botUsername) return `<div class="notice info">Telefonga xabar kelishi uchun administrator Telegram botni sozlashi kerak.</div>`;
+  return `<div class="notice warn">📱 Telefoningizga xabar kelishi uchun Telegramni ulang: <a href="https://t.me/${esc(S.settings.botUsername)}?start=${esc(me.tgCode)}" target="_blank" rel="noopener"><b>shu yerni bosing</b></a> va botda «Start»ni bosing.</div>`;
+}
+function renderXabarlar(){
+  const list=[...(S.notifications||[])].reverse();
+  if(!readSent&&list.some(n=>!n.read)){readSent=true;setTimeout(()=>act('readAll'),1500);}
+  return `<h1 class="page-title">Xabarlar</h1><p class="page-sub">Sizga kelgan bildirishnomalar</p>
+  <div class="panel"><div class="mini-list">${list.length?list.map(n=>`<div class="mini-row" style="${n.read?'':'background:#3b82f60f'}">
+    <span style="white-space:pre-line;${n.level==='warn'?'color:#fca5a5':''}">${esc(n.text)}</span><span class="muted" style="font-size:12px;white-space:nowrap">${fmtTime(n.ts)}</span></div>`).join(''):
+    `<div class="mini-row muted">Xabar yo'q</div>`}</div></div>`;
+}
+function renderTarix(){
+  const list=[...S.history].reverse().slice(0,200);
+  return `<h1 class="page-title">Tarix</h1><p class="page-sub">Tozalangan va nazoratdan o'tgan xonalar</p>
+  <input id="tarixSearch" class="search" placeholder="Qidirish: xona, xodim...">
+  <div class="panel" id="tarixPanel">${table([
+    {label:'Vaqt',render:h=>fmtTime(h.ts)},{label:'Xona',render:h=>`<b>${h.room}</b>`},
+    {label:'Tozaladi',render:h=>esc(h.cleaner)},{label:'Tekshirdi',render:h=>esc(h.inspector)},
+    {label:'Boshlash',render:h=>h.waitMin==null?'—':h.waitMin+' daq'},{label:'Tozalash',render:h=>h.cleanMin==null?'—':h.cleanMin+' daq'},
+    {label:'Belgi',render:h=>(h.lateStart?pill('#ef4444','Kech boshladi')+' ':'')+(h.lateFinish?pill('#ef4444','Vaqtdan oshdi')+' ':'')+(h.rework?pill('#f59e0b','Qayta: '+h.rework):'')||pill('#22c55e','Vaqtida')}],
+    list,null,"Hali tarix yo'q")}</div>`;
+}
+function renderStatistika(){
+  const H=S.history, todayStr=new Date().toDateString();
+  const today=H.filter(h=>new Date(h.ts).toDateString()===todayStr);
+  const by={};
+  H.forEach(h=>{const k=h.cleaner;(by[k]=by[k]||{n:0,sum:0,cnt:0,late:0,rework:0});by[k].n++;if(h.cleanMin!=null){by[k].sum+=h.cleanMin;by[k].cnt++;}if(h.lateStart||h.lateFinish)by[k].late++;by[k].rework+=h.rework||0;});
+  const lateNow=openTasks().filter(t=>t.lateStart||t.lateFinish).length;
+  const timed=H.filter(h=>h.cleanMin!=null), avg=timed.length?Math.round(timed.reduce((s,h)=>s+h.cleanMin,0)/timed.length):'—';
+  return `<h1 class="page-title">Statistika</h1><p class="page-sub">Tozalash ishlari bo'yicha ko'rsatkichlar</p>
+  <div class="stat-row">
+    <div class="stat-card"><div class="lbl">Jami tozalangan</div><div class="val">${H.length}</div></div>
+    <div class="stat-card"><div class="lbl">Bugun tozalangan</div><div class="val">${today.length}</div></div>
+    <div class="stat-card"><div class="lbl">Hozir kechikayotgan</div><div class="val" style="color:#ef4444">${lateNow}</div></div>
+    <div class="stat-card"><div class="lbl">O'rtacha tozalash</div><div class="val">${avg}${avg==='—'?'':' daq'}</div></div>
+  </div>
+  <div class="panel"><div class="panel-head">Tozalovchilar reytingi</div>${table([
+    {label:'Xodim',render:r=>esc(r[0])},{label:'Tozalagan',render:r=>r[1].n},
+    {label:"O'rtacha vaqt",render:r=>r[1].cnt?Math.round(r[1].sum/r[1].cnt)+' daq':'—'},
+    {label:'Kechikishlar',render:r=>r[1].late?`<span style="color:#f87171">${r[1].late}</span>`:'0'},
+    {label:'Qaytarilgan',render:r=>r[1].rework}],Object.entries(by).sort((a,b)=>b[1].n-a[1].n),null,"Hali ma'lumot yo'q")}</div>`;
+}
+function renderStaff(){
+  const me=S.me;
+  return `<h1 class="page-title">Xodimlar</h1><p class="page-sub">Tozalovchilar, nazoratchilar va administratorlar</p>
+  <div class="panel">${table([
+    {label:'Ism',render:s=>`<b>${esc(s.name)}</b><div class="muted" style="font-size:12px">${esc(s.username)}</div>`},
+    {label:'Rol',render:s=>esc(ROLE_LABEL[s.role]||s.role)},
+    {label:'Qavatlar',render:s=>s.role==='tozalovchi'?((s.floors&&s.floors.length)?s.floors.join(', '):'Hammasi'):'—'},
+    {label:'Holat',render:s=>s.active===false?pill('#8992a9','Ishda emas'):pill('#22c55e','Ishda')},
+    {label:'Telegram',render:s=>s.tgLinked?pill('#22c55e','Ulangan'):(S.settings.botUsername?`<button class="btn" data-copytg="${s.id}">Havolani nusxalash</button>`:'<span class="muted">Bot sozlanmagan</span>')}],
+    S.staff,s=>{
+      let h='';
+      if(s.role==='tozalovchi') h+=`<button class="btn" data-floors="${s.id}">Qavat</button> `;
+      if(s.id!==me.id) h+=`<button class="btn" data-toggle="${s.id}">${s.active===false?'Ishga qaytarish':'Ishda emas'}</button> `;
+      h+=`<button class="btn" data-resetpass="${s.id}">Parol</button> `;
+      if(s.id!==me.id) h+=`<button class="btn red" data-rmstaff="${s.id}">O'chirish</button>`;
+      return h;
+    })}</div>
+  <div class="panel"><div class="panel-head">Yangi xodim qo'shish</div>
+    <div class="form-grid">
+      <div class="field"><label>Ism</label><input id="ns-name"></div>
+      <div class="field"><label>Rol</label><select id="ns-role"><option value="tozalovchi">Tozalovchi (farrosh)</option><option value="nazoratchi">Nazoratchi</option><option value="boshqaruv">Administrator</option></select></div>
+      <div class="field"><label>Login</label><input id="ns-user"></div>
+      <div class="field"><label>Parol</label><input id="ns-pass"></div>
+      <div class="field"><label>Telefon</label><input id="ns-phone" placeholder="+998"></div>
+      <div class="field"><label>Qavatlar (bo'sh = hammasi)</label><input id="ns-floors" placeholder="1,2"></div>
+    </div>
+    <div style="padding:0 18px 18px"><button class="btn primary" id="addStaffBtn">+ Qo'shish</button></div>
+  </div>`;
+}
+function renderSettings(){
+  const st=S.settings;
+  let hasOld=false; try{hasOld=!!localStorage.getItem('pms_rooms');}catch(e){}
+  return `<h1 class="page-title">Sozlamalar</h1><p class="page-sub">Vaqt chegaralari, Telegram va ulanish</p>
+  <div class="panel"><div class="panel-head">Vaqt chegaralari (daqiqa)</div>
+    <div class="form-grid">
+      <div class="field"><label>Xabar kelgandan keyin boshlash</label><input id="st-start" type="number" min="1" value="${st.startLimit}"></div>
+      <div class="field"><label>Tozalash uchun beriladigan vaqt</label><input id="st-clean" type="number" min="1" value="${st.cleanLimit}"></div>
+      <div class="field"><label>Nazoratchi tekshirishi uchun</label><input id="st-insp" type="number" min="1" value="${st.inspectLimit}"></div>
+    </div>
+    <div style="padding:0 18px 18px"><button class="btn primary" id="saveLimits">Saqlash</button>
+      <span class="hint" style="margin-left:10px">Kalit topshirilgandan xona toza bo'lguncha: ${st.startLimit+st.cleanLimit} daq</span></div>
+  </div>
+  <div class="panel"><div class="panel-head">📱 Telegram bildirishnomalari
+      ${st.botUsername?pill('#22c55e','@'+st.botUsername+' ulangan'):st.hasToken?pill('#ef4444',st.tgError||'Ulanmoqda...'):pill('#8992a9','Sozlanmagan')}</div>
+    <div class="panel-body">
+      <ol style="margin:0 0 14px;padding-left:18px">
+        <li>Telegramda <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> ni oching → <code>/newbot</code> → botga nom bering.</li>
+        <li>BotFather bergan <b>token</b>ni pastga qo'yib, «Saqlash»ni bosing.</li>
+        <li>Har bir xodim o'z telefonidan dasturga kirib, «Profil»dagi havolani bosadi (yoki «Xodimlar»dan havolani nusxalab, xodimga yuboring).</li>
+      </ol>
+    </div>
+    <div class="form-grid" style="padding-top:0">
+      <div class="field"><label>Bot token</label><input id="st-token" value="${esc(st.telegramToken||'')}" placeholder="123456789:AA..."></div>
+      <div class="field" style="display:flex;align-items:flex-end;gap:8px"><button class="btn primary" id="saveToken">Saqlash</button><button class="btn" id="tgTest">Sinov xabari</button></div>
+    </div>
+  </div>
+  <div class="panel"><div class="panel-head">🌐 Telefonlardan ulanish</div>
+    <div class="panel-body">Xodimlar telefonlari shu Wi-Fi tarmog'ida bo'lsa, brauzerda quyidagi manzilni ochadi:<br>
+      ${(st.lanUrls||[]).map(u=>`<code style="font-size:14px">${esc(u)}</code>`).join(' ')||'<span class="muted">Tarmoq topilmadi</span>'}
+      <div class="hint" style="margin-top:8px">Server kompyuterda doim yoqilgan turishi kerak (start.bat).</div>
+    </div>
+  </div>
+  ${hasOld?`<div class="panel"><div class="panel-head">Eski ma'lumotlar</div><div class="panel-body">Bu brauzerda eski versiyadan qolgan xona va xodimlar bor. Ularni serverga ko'chirish mumkin.
+    <div style="margin-top:10px"><button class="btn primary" id="importOld">Import qilish</button></div></div></div>`:''}`;
+}
+function renderProfile(){
+  const u=S.me, st=S.settings;
+  const tgLink=st.botUsername?`https://t.me/${st.botUsername}?start=${u.tgCode}`:'';
+  const notifState=window.Notification?window.Notification.permission:'unsupported';
+  return `<h1 class="page-title">Mening profilim</h1><p class="page-sub">${esc(ROLE_LABEL[u.role]||u.role)}</p>
+  <div class="panel"><div class="panel-head">📱 Telefonga xabarlar (Telegram)</div><div class="panel-body">
+    ${u.tgLinked?`${pill('#22c55e','Ulangan')} Vazifalar Telegramga keladi. Qayta ulash uchun: <a href="${esc(tgLink)}" target="_blank" rel="noopener">havola</a>`:
+      tgLink?`<a class="btn primary" style="display:inline-block;text-decoration:none;padding:12px 18px" href="${esc(tgLink)}" target="_blank" rel="noopener">Telegramni ulash</a>
+      <div class="hint" style="margin-top:8px">Bosgach, botda «Start» tugmasini bosing.</div>`:
+      `<span class="muted">Administrator hali Telegram botni sozlamagan.</span>`}
+    ${notifState==='default'?`<div style="margin-top:12px"><button class="btn" id="askNotif">Brauzer bildirishnomalarini yoqish</button></div>`:''}
+  </div></div>
+  <div class="panel"><div class="form-grid">
+    <div class="field"><label>Ism</label><input id="pf-name" value="${esc(u.name)}"></div>
+    <div class="field"><label>Login</label><input value="${esc(u.username)}" disabled></div>
+    <div class="field"><label>Telefon</label><input id="pf-phone" value="${esc(u.phone||'')}"></div>
+    <div class="field"><label>Yangi parol</label><input id="pf-pass" type="password" placeholder="O'zgartirish uchun kiriting"></div>
+  </div>
+  <div style="padding:0 18px 18px"><button class="btn primary" id="pfSave">Saqlash</button></div>
+  </div>`;
+}
+
+// ================== Asosiy ekran ==================
+function navFor(role){
+  const unread=(S.notifications||[]).filter(n=>!n.read).length;
+  const x={id:'xabarlar',label:'Xabarlar',count:unread};
+  if(role==='tozalovchi') return [{id:'mytask',label:'Mening vazifam'},x,{id:'tarix',label:'Tarix'},{id:'profile',label:'Profil'}];
+  if(role==='nazoratchi') return [{id:'inspect',label:'Tekshiruv',count:openTasks().filter(t=>t.status==='tekshiruvda').length},{id:'housekeeping',label:'Tozalash'},x,{id:'tarix',label:'Tarix'},{id:'profile',label:'Profil'}];
+  return [{id:'dashboard',label:'Bosh sahifa'},{id:'rooms',label:'Xonalar'},{id:'housekeeping',label:'Tozalash',count:openTasks().filter(t=>t.lateStart||t.lateFinish).length},x,
+    {id:'tarix',label:'Tarix'},{id:'statistika',label:'Statistika'},{id:'staff',label:'Xodimlar'},{id:'settings',label:'Sozlamalar'},{id:'profile',label:'Profil'}];
+}
+function render(){
+  if(!token){renderLogin();return;}
+  if(!S) return;
+  pendingRender=false;
+  const u=S.me, nav=navFor(u.role);
+  if(!nav.some(n=>n.id===section)) section=nav[0].id;
+  const views={dashboard:renderDashboard,rooms:renderRooms,housekeeping:renderHousekeeping,mytask:renderMyTask,inspect:renderInspect,
+    xabarlar:renderXabarlar,tarix:renderTarix,statistika:renderStatistika,staff:renderStaff,settings:renderSettings,profile:renderProfile};
+  const scroll=document.querySelector('.content')?window.scrollY:0;
+  const searchVals={}; document.querySelectorAll('.search').forEach(i=>searchVals[i.id]=i.value);
+  document.getElementById('root').innerHTML=`
+  <div class="app">
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+    <div class="sidebar" id="sidebarEl">
+      <div class="sb-brand">Mehmonxona</div>
+      <div class="sb-nav">${nav.map(n=>`<button class="sb-item ${section===n.id?'active':''}" data-nav="${n.id}"><span>${n.label}</span>${n.count?`<span class="sb-count">${n.count}</span>`:''}</button>`).join('')}</div>
+      <button class="sb-logout" id="logoutBtn">Chiqish</button>
+    </div>
+    <div class="main">
+      <div class="topbar"><div style="display:flex;align-items:center"><button class="menu-toggle" id="menuToggle">&#9776;</button>
+        <span class="conn ${online?'':'off'}" id="conn"><i></i> ${online?'Onlayn':"Aloqa yo'q"}</span></div>
+        <div class="topbar-right"><span class="uname">${esc(u.name)}</span><div class="avatar">${esc((u.name||'?')[0])}</div></div></div>
+      <div class="content">${views[section]()}</div>
+    </div>
+  </div>`;
+  window.scrollTo(0,scroll);
+  Object.entries(searchVals).forEach(([id,v])=>{const i=document.getElementById(id);if(i&&v){i.value=v;i.dispatchEvent(new Event('input'));}});
+  wire();
+}
+
+// ================== Tugmalar ==================
+function wire(){
+  const $=id=>document.getElementById(id);
+  const on=(attr,fn)=>document.querySelectorAll(`[data-${attr}]`).forEach(b=>b.onclick=()=>fn(b.dataset[attr.replace(/-./g,m=>m[1].toUpperCase())]));
+  const sidebarEl=$('sidebarEl'), backdrop=$('sidebarBackdrop');
+  $('menuToggle').onclick=()=>{sidebarEl.classList.toggle('open');backdrop.classList.toggle('show');};
+  backdrop.onclick=()=>{sidebarEl.classList.remove('open');backdrop.classList.remove('show');};
+  on('nav',v=>{section=v;readSent=false;render();window.scrollTo(0,0);});
+  $('logoutBtn').onclick=()=>{api('/api/logout',{}).catch(()=>{});logoutLocal();};
+  wireSearch('roomsSearch','#roomsPanel'); wireSearch('tarixSearch','#tarixPanel');
+
+  // vazifalar
+  on('start',id=>act('startTask',{id:+id}));
+  on('finish',id=>{if(confirm('Xona to\'liq tozalandimi?'))act('finishTask',{id:+id});});
+  on('inspok',id=>act('inspect',{id:+id,ok:true}));
+  on('insprej',id=>{const r=prompt('Nima kamchilik bor? (tozalovchiga yuboriladi)','');if(r!==null)act('inspect',{id:+id,ok:false,reason:r.trim()||'Nazoratchi qaytardi'});});
+  on('cancel',id=>{if(confirm("Vazifani bekor qilib, xonani bo'sh deb belgilaysizmi?"))act('cancelTask',{id:+id});});
+  on('reassign',id=>{
+    const cl=S.staff.filter(s=>s.role==='tozalovchi'&&s.active!==false);
+    if(!cl.length){toast("Faol tozalovchi yo'q",'err');return;}
+    const busy=s=>openTasks().some(t=>t.cleanerId===s.id&&(t.status==='tayinlandi'||t.status==='jarayonda'));
+    const v=prompt('Kimga berilsin? Raqamini yozing:\n'+cl.map((s,i)=>`${i+1}) ${s.name} — ${busy(s)?'band':"bo'sh"}`).join('\n'));
+    const s=cl[Number(v)-1]; if(s) act('reassign',{id:+id,cleanerId:s.id});
+  });
+
+  // xonalar
+  on('checkout',n=>{if(confirm(`${n}-xona: mehmon chiqib, kalitni topshirdimi?\nTozalovchiga darhol xabar yuboriladi.`))act('checkout',{num:+n});});
+  on('needclean',n=>act('needClean',{num:+n}));
+  on('checkin',n=>{const g=prompt('Mehmon ismi:','');if(g!==null)act('checkin',{num:+n,guest:g});});
+  on('note',n=>{const r=S.rooms.find(x=>x.num===+n);const v=prompt('Xona izohi (masalan: santexnika buzuq):',r.note||'');if(v!==null)act('note',{num:+n,note:v});});
+  on('editroom',n=>{
+    const r=S.rooms.find(x=>x.num===+n);
+    const nn=prompt('Xona raqami:',r.num); if(nn===null) return;
+    const ty=prompt('Turi:',r.type); if(ty===null) return;
+    const fl=prompt('Qavat:',r.floor); if(fl===null) return;
+    act('editRoom',{num:+n,newNum:+nn,roomType:ty,floor:+fl});
+  });
+  on('rmroom',n=>{if(confirm(n+"-xonani o'chirmoqchimisiz?"))act('deleteRoom',{num:+n});});
+  on('rmfloor',f=>{if(confirm(f+"-qavatni o'chirmoqchimisiz?"))act('deleteFloor',{floor:+f});});
+  if($('addFloorBtn')) $('addFloorBtn').onclick=()=>act('addFloor',{floor:+$('nf-num').value});
+  if($('addRoomBtn')) $('addRoomBtn').onclick=()=>act('addRoom',{num:+$('nr-num').value,roomType:$('nr-type').value,floor:+$('nr-floor').value});
+
+  // xodimlar
+  const parseFloors=v=>v.trim()?v.split(',').map(x=>Number(x.trim())).filter(n=>n):[];
+  on('floors',id=>{const s=S.staff.find(x=>x.id===+id);const v=prompt("Qavatlar (vergul bilan, bo'sh = hammasi):",(s.floors||[]).join(','));if(v!==null)act('updateStaff',{id:+id,floors:parseFloors(v)});});
+  on('toggle',id=>{const s=S.staff.find(x=>x.id===+id);act('updateStaff',{id:+id,active:s.active===false});});
+  on('resetpass',id=>{const v=prompt('Yangi parol:','');if(v&&v.trim())act('updateStaff',{id:+id,password:v.trim()});});
+  on('rmstaff',id=>{const s=S.staff.find(x=>x.id===+id);if(confirm(s.name+"ni o'chirmoqchimisiz?"))act('deleteStaff',{id:+id});});
+  on('copytg',id=>{
+    const s=S.staff.find(x=>x.id===+id), link=`https://t.me/${S.settings.botUsername}?start=${s.tgCode}`;
+    (navigator.clipboard?navigator.clipboard.writeText(link):Promise.reject()).then(()=>toast('Havola nusxalandi — xodimga yuboring','ok')).catch(()=>prompt('Havolani nusxalang:',link));
+  });
+  if($('addStaffBtn')) $('addStaffBtn').onclick=()=>act('addStaff',{name:$('ns-name').value,role:$('ns-role').value,username:$('ns-user').value,password:$('ns-pass').value,phone:$('ns-phone').value,floors:parseFloors($('ns-floors').value)});
+
+  // sozlamalar
+  if($('saveLimits')) $('saveLimits').onclick=()=>act('settings',{startLimit:+$('st-start').value,cleanLimit:+$('st-clean').value,inspectLimit:+$('st-insp').value});
+  if($('saveToken')) $('saveToken').onclick=()=>act('settings',{telegramToken:$('st-token').value.trim()});
+  if($('tgTest')) $('tgTest').onclick=()=>act('tgTest');
+  if($('importOld')) $('importOld').onclick=async()=>{
+    const g=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}};
+    const ok=await act('import',{rooms:g('pms_rooms'),floors:g('pms_floors'),staff:(g('pms_staff')||[]).map(s=>({...s,role:s.role})),history:g('pms_history')});
+    if(ok){['pms_rooms','pms_floors','pms_staff','pms_history','pms_session'].forEach(k=>{try{localStorage.removeItem(k);}catch(e){}});render();}
+  };
+
+  // profil
+  if($('pfSave')) $('pfSave').onclick=()=>act('profile',{name:$('pf-name').value,phone:$('pf-phone').value,password:$('pf-pass').value});
+  if($('askNotif')) $('askNotif').onclick=()=>Notification.requestPermission().then(()=>render());
+}
+
+// ================== Ishga tushirish ==================
+if(location.protocol==='file:') renderNoServer();
+else if(token){ refresh().then(()=>{ if(token) connect(); }); }
+else renderLogin();
+</script>
+</body>
+</html>
