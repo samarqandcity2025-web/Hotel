@@ -1,0 +1,25 @@
+TELEFONLARGA BILDIRISHNOMA UCHUN INTERNET MANZILINI SOZLASH (bir marta, bepul)
+==============================================================================
+
+Telefon brauzerlari bildirishnomani faqat https:// manzilda ruxsat beradi.
+Tailscale Funnel kompyuteringizga bepul va doimiy https manzil beradi,
+masalan: https://hotel-pc.tail1234.ts.net
+
+1) Tailscale'ni o'rnating:  https://tailscale.com/download/windows
+2) O'rnatgach, Google akkauntingiz bilan kiring (Sign in).
+3) Brauzerda oching: https://login.tailscale.com/admin/dns
+   - "HTTPS Certificates" bo'limida  "Enable HTTPS"  tugmasini bosing.
+4) start.bat ni qayta ishga tushiring.
+   Birinchi marta qora oynada Funnel'ga ruxsat so'ralishi mumkin —
+   ko'rsatilgan havolani ochib, "Enable" ni bosing, keyin start.bat ni yana ishga tushiring.
+5) Dasturda: Sozlamalar -> "Internet manzili" bo'limida https manzil chiqadi.
+   Shu manzilni xodimlarga yuboring.
+
+XODIMLAR TELEFONIDA (har biri bir marta):
+  Android: Chrome'da manzilni oching -> kiring -> "Bildirishnomalarni yoqish" -> "Ruxsat berish".
+           Menyu (⋮) -> "Ilovani o'rnatish" — ekranda Mehmonxona ikonkasi paydo bo'ladi.
+  iPhone:  Safari'da manzilni oching -> pastdagi "Ulashish" (⬆️) -> "На экран Домой / Add to Home Screen".
+           Bosh ekrandagi Mehmonxona ikonkasidan oching -> kiring -> "Bildirishnomalarni yoqish" -> "Разрешить".
+           (iOS 16.4 yoki yangiroq kerak)
+
+ESLATMA: kompyuter va start.bat oynasi doim yoqiq turishi kerak.

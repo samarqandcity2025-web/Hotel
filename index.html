@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0f1e">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mehmonxona">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Mehmonxona — Xonalarni boshqarish</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
@@ -220,11 +227,11 @@ function checkNewNotifs(){
 
 // ================== Server bilan aloqa ==================
 async function api(url,body){
-  const r=await fetch(url,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:body?JSON.stringify(body):undefined});
+  const r=await fetch(url,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'1',...(token?{Authorization:'Bearer '+token}:{})},body:body?JSON.stringify(body):undefined});
   if(r.status===401){logoutLocal();throw new Error('auth');}
   return r.json();
 }
-function setState(st){S=st;skew=st.serverTime-Date.now();checkNewNotifs();}
+function setState(st){S=st;skew=st.serverTime-Date.now();checkNewNotifs();syncPush();}
 function setOnline(v){online=v;const el=document.getElementById('conn');if(el){el.classList.toggle('off',!v);el.lastChild.textContent=v?' Onlayn':" Aloqa yo'q";}}
 async function refresh(){
   try{setState(await api('/api/state'));setOnline(true);safeRender();}
@@ -254,7 +261,66 @@ function connect(){
   es.onopen=()=>{setOnline(true);refresh();};
   es.onerror=()=>setOnline(false);
 }
+// ================== Telefon bildirishnomalari (Web Push) ==================
+let swReg=null, pushSub=null, pushChecked=false, pushSynced=false, pushBusy=false;
+const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const isStandalone=()=>window.matchMedia&&matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+const pushSupported=()=>window.isSecureContext&&'serviceWorker' in navigator&&'PushManager' in window&&!!window.Notification;
+function b64ToBytes(s){const p='='.repeat((4-s.length%4)%4),b=atob((s+p).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(b,c=>c.charCodeAt(0));}
+async function initPush(){
+  if(!window.isSecureContext||!('serviceWorker' in navigator)){pushChecked=true;return;}
+  try{
+    swReg=await navigator.serviceWorker.register('/sw.js');
+    if('PushManager' in window) pushSub=await swReg.pushManager.getSubscription();
+  }catch(e){console.log('SW:',e);}
+  pushChecked=true; syncPush(); safeRender();
+}
+// Bu telefondagi obunani joriy xodimga bog'lash (boshqa xodim kirsa, unga o'tadi)
+function syncPush(){
+  if(!pushSub||!token||!S||pushSynced) return;
+  pushSynced=true;
+  api('/api/action',{type:'pushSubscribe',sub:pushSub.toJSON(),silent:true}).catch(()=>{pushSynced=false;});
+}
+async function enablePush(){
+  if(pushBusy) return; pushBusy=true;
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){toast("Ruxsat berilmadi. Telefon sozlamalaridan bildirishnomaga ruxsat bering.",'err',8000);return;}
+    swReg=swReg||await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.ready;
+    pushSub=await swReg.pushManager.getSubscription()||await swReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToBytes(S.settings.vapidPublic)});
+    pushSynced=true;
+    await act('pushSubscribe',{sub:pushSub.toJSON()});
+  }catch(e){toast('Bildirishnomani yoqib bo\'lmadi: '+e.message,'err',8000);}
+  finally{pushBusy=false;render();}
+}
+function pushPanel(compact){
+  const hdr=t=>`<div class="notice ${t[0]}">${t[1]}</div>`;
+  if(!S.settings.vapidPublic) return '';
+  if(!window.isSecureContext) return compact?'':hdr(['info',"🔔 Telefonga bildirishnoma kelishi uchun ilovani <b>https://</b> bilan boshlanadigan internet manzildan oching (administratordan so'rang)."]);
+  if(isIOS&&!isStandalone()) return hdr(['warn',`📲 <b>iPhone'da bildirishnoma olish uchun ilovani o'rnating:</b><br>
+    1) Safari'da pastdagi <b>Ulashish</b> tugmasini bosing (kvadrat va ⬆️ strelka)<br>
+    2) <b>«На экран Домой» / «Add to Home Screen»</b>ni tanlang<br>
+    3) Bosh ekrandagi <b>Mehmonxona</b> ikonkasidan oching va shu yerga qayting`]);
+  if(!pushSupported()) return compact?'':hdr(['info','Bu brauzer bildirishnomalarni qo\'llamaydi. Chrome (Android) yoki Safari (iPhone) dan foydalaning.']);
+  if(!pushChecked) return '';
+  if(Notification.permission==='denied') return hdr(['warn',"🔕 Bildirishnomalar bloklangan. Telefon <b>Sozlamalar → Ilovalar → Chrome/Mehmonxona → Bildirishnomalar</b> dan yoqing, keyin sahifani yangilang."]);
+  if(pushSub&&Notification.permission==='granted') return compact?'':`<div class="notice info" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <span>✅ Bu telefonda bildirishnomalar yoqilgan</span><button class="btn" id="pushTest">Sinov xabari</button></div>`;
+  return `<div class="notice warn" style="text-align:center">
+    <div style="margin-bottom:10px">🔔 <b>Yangi vazifalar telefoningizga kelishi uchun bildirishnomalarni yoqing</b></div>
+    <button class="btn primary" id="pushEnable" style="padding:12px 20px;font-size:15px">🔔 Bildirishnomalarni yoqish</button>
+    ${!isStandalone()&&!isIOS?'<div class="hint" style="margin-top:8px">Maslahat: brauzer menyusidan (⋮) «Ilovani o\'rnatish» / «Bosh ekranga qo\'shish»ni bosing</div>':''}</div>`;
+}
+
+async function logout(){
+  // bu telefon chiqqan xodimga xabar olishni to'xtatadi
+  if(pushSub) await api('/api/action',{type:'pushUnsubscribe',endpoint:pushSub.endpoint}).catch(()=>{});
+  await api('/api/logout',{}).catch(()=>{});
+  logoutLocal();
+}
 function logoutLocal(){
+  pushSynced=false;
   token=null;S=null;lastNotifId=null;section=null;
   try{localStorage.removeItem('pms_token');}catch(e){}
   if(es){es.close();es=null;}
@@ -317,6 +383,7 @@ function renderDashboard(){
   const cl=S.staff.filter(s=>s.role==='tozalovchi');
   return `
   <h1 class="page-title">Xayrli kun!</h1><p class="page-sub">Bugungi xonalar holati — jonli</p>
+  ${pushPanel(true)}
   <div class="stat-row">
     <div class="stat-card"><div class="lbl">Jami xonalar</div><div class="val">${R.length}</div></div>
     <div class="stat-card"><div class="lbl">Bo'sh</div><div class="val" style="color:#22c55e">${c('bosh')}</div></div>
@@ -430,9 +497,8 @@ function renderInspect(){
 // ================== Umumiy bo'limlar ==================
 function tgNotice(){
   const me=S.me;
-  if(me.tgLinked) return '';
-  if(!S.settings.botUsername) return `<div class="notice info">Telefonga xabar kelishi uchun administrator Telegram botni sozlashi kerak.</div>`;
-  return `<div class="notice warn">📱 Telefoningizga xabar kelishi uchun Telegramni ulang: <a href="https://t.me/${esc(S.settings.botUsername)}?start=${esc(me.tgCode)}" target="_blank" rel="noopener"><b>shu yerni bosing</b></a> va botda «Start»ni bosing.</div>`;
+  if(me.tgLinked||!S.settings.botUsername) return pushPanel();
+  return pushPanel()+`<div class="notice info">Telegram orqali ham olish mumkin (ixtiyoriy): <a href="https://t.me/${esc(S.settings.botUsername)}?start=${esc(me.tgCode)}" target="_blank" rel="noopener"><b>ulash</b></a></div>`;
 }
 function renderXabarlar(){
   const list=[...(S.notifications||[])].reverse();
@@ -481,7 +547,7 @@ function renderStaff(){
     {label:'Rol',render:s=>esc(ROLE_LABEL[s.role]||s.role)},
     {label:'Qavatlar',render:s=>s.role==='tozalovchi'?((s.floors&&s.floors.length)?s.floors.join(', '):'Hammasi'):'—'},
     {label:'Holat',render:s=>s.active===false?pill('#8992a9','Ishda emas'):pill('#22c55e','Ishda')},
-    {label:'Telegram',render:s=>s.tgLinked?pill('#22c55e','Ulangan'):(S.settings.botUsername?`<button class="btn" data-copytg="${s.id}">Havolani nusxalash</button>`:'<span class="muted">Bot sozlanmagan</span>')}],
+    {label:'Telefon xabari',render:s=>(s.pushCount?pill('#22c55e','🔔 Yoqilgan'):pill('#ef4444','Yoqilmagan'))+(s.tgLinked?' '+pill('#3b82f6','Telegram'):'')+(S.settings.botUsername&&!s.tgLinked?` <button class="btn" data-copytg="${s.id}">Telegram havola</button>`:'')}],
     S.staff,s=>{
       let h='';
       if(s.role==='tozalovchi') h+=`<button class="btn" data-floors="${s.id}">Qavat</button> `;
@@ -515,7 +581,18 @@ function renderSettings(){
     <div style="padding:0 18px 18px"><button class="btn primary" id="saveLimits">Saqlash</button>
       <span class="hint" style="margin-left:10px">Kalit topshirilgandan xona toza bo'lguncha: ${st.startLimit+st.cleanLimit} daq</span></div>
   </div>
-  <div class="panel"><div class="panel-head">📱 Telegram bildirishnomalari
+  <div class="panel"><div class="panel-head">🌍 Internet manzili (telefonlar uchun)
+      ${st.publicUrl?pill('#22c55e','Ishlayapti'):pill('#ef4444','Ulanmagan')}</div>
+    <div class="panel-body">
+      ${st.publicUrl?`Xodimlar telefonda shu manzilni ochadi va ilovani o'rnatadi:<br>
+        <code style="font-size:15px;display:inline-block;margin:8px 0">${esc(st.publicUrl)}</code>
+        <button class="btn" id="copyUrl">Nusxalash</button>
+        <div class="hint">Telefonga bildirishnoma faqat shu https manzil orqali ishlaydi.</div>`:
+        `Telefonlarga bildirishnoma kelishi uchun kompyuter internet manzilga (https) ulanishi kerak.
+        <code>tunnel-sozlash.txt</code> faylidagi ko'rsatmaga amal qiling, keyin <code>start.bat</code> ni qayta ishga tushiring.`}
+    </div>
+  </div>
+  <div class="panel"><div class="panel-head">📱 Telegram bildirishnomalari (ixtiyoriy)
       ${st.botUsername?pill('#22c55e','@'+st.botUsername+' ulangan'):st.hasToken?pill('#ef4444',st.tgError||'Ulanmoqda...'):pill('#8992a9','Sozlanmagan')}</div>
     <div class="panel-body">
       <ol style="margin:0 0 14px;padding-left:18px">
@@ -541,14 +618,10 @@ function renderSettings(){
 function renderProfile(){
   const u=S.me, st=S.settings;
   const tgLink=st.botUsername?`https://t.me/${st.botUsername}?start=${u.tgCode}`:'';
-  const notifState=window.Notification?window.Notification.permission:'unsupported';
   return `<h1 class="page-title">Mening profilim</h1><p class="page-sub">${esc(ROLE_LABEL[u.role]||u.role)}</p>
-  <div class="panel"><div class="panel-head">📱 Telefonga xabarlar (Telegram)</div><div class="panel-body">
-    ${u.tgLinked?`${pill('#22c55e','Ulangan')} Vazifalar Telegramga keladi. Qayta ulash uchun: <a href="${esc(tgLink)}" target="_blank" rel="noopener">havola</a>`:
-      tgLink?`<a class="btn primary" style="display:inline-block;text-decoration:none;padding:12px 18px" href="${esc(tgLink)}" target="_blank" rel="noopener">Telegramni ulash</a>
-      <div class="hint" style="margin-top:8px">Bosgach, botda «Start» tugmasini bosing.</div>`:
-      `<span class="muted">Administrator hali Telegram botni sozlamagan.</span>`}
-    ${notifState==='default'?`<div style="margin-top:12px"><button class="btn" id="askNotif">Brauzer bildirishnomalarini yoqish</button></div>`:''}
+  <div class="panel"><div class="panel-head">🔔 Telefonga bildirishnomalar ${u.pushCount?pill('#22c55e',u.pushCount+' ta qurilma'):''}</div><div class="panel-body">
+    ${pushPanel()||'<span class="muted">—</span>'}
+    ${tgLink?`<div class="hint" style="margin-top:6px">Telegram (ixtiyoriy): ${u.tgLinked?'ulangan':`<a href="${esc(tgLink)}" target="_blank" rel="noopener">ulash</a>`}</div>`:''}
   </div></div>
   <div class="panel"><div class="form-grid">
     <div class="field"><label>Ism</label><input id="pf-name" value="${esc(u.name)}"></div>
@@ -607,7 +680,9 @@ function wire(){
   $('menuToggle').onclick=()=>{sidebarEl.classList.toggle('open');backdrop.classList.toggle('show');};
   backdrop.onclick=()=>{sidebarEl.classList.remove('open');backdrop.classList.remove('show');};
   on('nav',v=>{section=v;readSent=false;render();window.scrollTo(0,0);});
-  $('logoutBtn').onclick=()=>{api('/api/logout',{}).catch(()=>{});logoutLocal();};
+  $('logoutBtn').onclick=logout;
+  if($('pushEnable')) $('pushEnable').onclick=enablePush;
+  if($('pushTest')) $('pushTest').onclick=()=>act('pushTest');
   wireSearch('roomsSearch','#roomsPanel'); wireSearch('tarixSearch','#tarixPanel');
 
   // vazifalar
@@ -657,6 +732,7 @@ function wire(){
   if($('saveLimits')) $('saveLimits').onclick=()=>act('settings',{startLimit:+$('st-start').value,cleanLimit:+$('st-clean').value,inspectLimit:+$('st-insp').value});
   if($('saveToken')) $('saveToken').onclick=()=>act('settings',{telegramToken:$('st-token').value.trim()});
   if($('tgTest')) $('tgTest').onclick=()=>act('tgTest');
+  if($('copyUrl')) $('copyUrl').onclick=()=>{const u=S.settings.publicUrl;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>toast('Manzil nusxalandi — xodimlarga yuboring','ok')).catch(()=>prompt('Manzilni nusxalang:',u));};
   if($('importOld')) $('importOld').onclick=async()=>{
     const g=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}};
     const ok=await act('import',{rooms:g('pms_rooms'),floors:g('pms_floors'),staff:(g('pms_staff')||[]).map(s=>({...s,role:s.role})),history:g('pms_history')});
@@ -665,13 +741,15 @@ function wire(){
 
   // profil
   if($('pfSave')) $('pfSave').onclick=()=>act('profile',{name:$('pf-name').value,phone:$('pf-phone').value,password:$('pf-pass').value});
-  if($('askNotif')) $('askNotif').onclick=()=>Notification.requestPermission().then(()=>render());
 }
 
 // ================== Ishga tushirish ==================
 if(location.protocol==='file:') renderNoServer();
-else if(token){ refresh().then(()=>{ if(token) connect(); }); }
-else renderLogin();
+else{
+  initPush();
+  if(token){ refresh().then(()=>{ if(token) connect(); }); }
+  else renderLogin();
+}
 </script>
 </body>
 </html>

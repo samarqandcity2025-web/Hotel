@@ -1,6 +1,8 @@
 'use strict';
 // Mehmonxona — xonalarni boshqarish serveri (qo'shimcha kutubxonasiz, faqat Node.js)
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto'), os = require('os');
+let webpush = null;
+try { webpush = require('web-push'); } catch { console.log('Diqqat: web-push o\'rnatilmagan — telefonga bildirishnoma ishlamaydi (npm install)'); }
 
 const PORT = Number(process.env.PORT) || 3000;
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, 'data.json');
@@ -43,6 +45,24 @@ function seed() {
 let db;
 try { db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch { db = seed(); }
 db.settings = { ...DEFAULT_SETTINGS, ...db.settings };
+db.staff.forEach(s => { if (!Array.isArray(s.push)) s.push = []; });
+
+// ---------- Web Push (ilovaning o'z bildirishnomalari) ----------
+if (webpush) {
+  if (!db.settings.vapid) db.settings.vapid = webpush.generateVAPIDKeys();
+  webpush.setVapidDetails('mailto:admin@mehmonxona.local', db.settings.vapid.publicKey, db.settings.vapid.privateKey);
+}
+function pushSend(s, text, { urgent = false, taskId = null } = {}) {
+  if (!webpush || !s.push || !s.push.length) return;
+  const lines = text.split('\n');
+  const payload = JSON.stringify({ title: lines[0], body: lines.slice(1).join('\n'), urgent, tag: taskId ? 'task-' + taskId : 'msg-' + Date.now() });
+  s.push.forEach(sub => {
+    webpush.sendNotification(sub, payload, { TTL: 3600, urgency: 'high' }).catch(e => {
+      if (e.statusCode === 404 || e.statusCode === 410) { s.push = s.push.filter(x => x.endpoint !== sub.endpoint); save(); }
+      else console.log('Push xato:', e.statusCode || '', e.body || e.message);
+    });
+  });
+}
 
 let saveTimer = null;
 function save() {
@@ -71,7 +91,9 @@ function notify(userIds, text, { level = 'info', taskId = null, buttons = null }
   [...new Set(userIds.filter(Boolean))].forEach(uid => {
     db.notifications.push({ id: db.seq.notif++, to: uid, text, level, taskId, ts: Date.now(), read: false });
     const s = staffById(uid);
-    if (s && s.tgChat) tgSend(s.tgChat, text, buttons);
+    if (!s) return;
+    pushSend(s, text, { urgent: level === 'warn' || !!buttons, taskId });
+    if (s.tgChat) tgSend(s.tgChat, text, buttons);
   });
   if (db.notifications.length > 3000) db.notifications = db.notifications.slice(-2000);
 }
@@ -356,6 +378,21 @@ function doAction(u, b) {
       if (b.password) u.pass = hash(String(b.password));
       msg = 'Saqlandi'; break;
     }
+    case 'pushSubscribe': {
+      const sub = b.sub;
+      if (!sub || typeof sub.endpoint !== 'string' || !/^https:\/\//.test(sub.endpoint) || !sub.keys || !sub.keys.p256dh || !sub.keys.auth) fail("Noto'g'ri obuna");
+      // bitta telefon faqat bitta xodimga tegishli bo'ladi
+      db.staff.forEach(s => { s.push = (s.push || []).filter(x => x.endpoint !== sub.endpoint); });
+      u.push.push({ endpoint: sub.endpoint, keys: { p256dh: String(sub.keys.p256dh), auth: String(sub.keys.auth) } });
+      if (u.push.length > 5) u.push = u.push.slice(-5);
+      if (!b.silent) msg = 'Bildirishnomalar yoqildi'; break;
+    }
+    case 'pushUnsubscribe': u.push = (u.push || []).filter(x => x.endpoint !== b.endpoint); break;
+    case 'pushTest': {
+      if (!u.push || !u.push.length) fail('Bu hisobda bildirishnoma yoqilgan telefon yo\'q');
+      pushSend(u, '🔔 Sinov xabari\nBildirishnomalar ishlayapti!', { urgent: true });
+      msg = 'Sinov xabari yuborildi'; break;
+    }
     case 'readAll': db.notifications.forEach(n => { if (n.to === u.id) n.read = true; }); break;
 
     case 'settings': {
@@ -492,14 +529,46 @@ async function tgLoop() {
   }
 }
 
+// ---------- Internet manzili (Tailscale Funnel yoki ngrok — o'zi topiladi) ----------
+let publicUrl = process.env.PUBLIC_URL || null;
+function tailscaleUrl() {
+  return new Promise(ok => {
+    require('child_process').execFile('tailscale', ['funnel', 'status'], { timeout: 4000, windowsHide: true }, (err, out) => {
+      const m = !err && /https:\/\/[^\s()]+/.exec(String(out));
+      ok(m && /funnel on/i.test(out) ? m[0].replace(/\/$/, '') : null);
+    });
+  });
+}
+async function detectPublicUrl() {
+  if (process.env.PUBLIC_URL) return;
+  let found = null;
+  try { found = fs.readFileSync(path.join(__dirname, 'public-url.txt'), 'utf8').trim().replace(/\/$/, '') || null; } catch {}
+  if (!found) found = await tailscaleUrl();
+  if (!found) try {
+    const r = await fetch('http://127.0.0.1:4040/api/tunnels', { signal: AbortSignal.timeout(2000) });
+    const t = ((await r.json()).tunnels || []).find(x => x.public_url && x.public_url.startsWith('https://'));
+    if (t) found = t.public_url;
+  } catch {}
+  if (found !== publicUrl) { publicUrl = found; if (found) console.log('  Internet manzili: ' + found); broadcast(); }
+}
+setInterval(detectPublicUrl, 20000);
+setTimeout(detectPublicUrl, 3000);
+
 // ---------- HTTP ----------
+const STATIC = {
+  '/sw.js': ['sw.js', 'text/javascript; charset=utf-8'],
+  '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json'],
+  '/icon-192.png': ['icons/icon-192.png', 'image/png'],
+  '/icon-512.png': ['icons/icon-512.png', 'image/png'],
+  '/apple-touch-icon.png': ['icons/apple-touch-icon.png', 'image/png']
+};
 const clients = new Set();
 function broadcast() { for (const c of clients) c.res.write('data: change\n\n'); }
 setInterval(() => { for (const c of clients) c.res.write(': ping\n\n'); }, 25000);
 
 function pub(s, viewer) {
-  const { pass, tgCode, tgChat, ...rest } = s;
-  const out = { ...rest, tgLinked: !!tgChat };
+  const { pass, tgCode, tgChat, push, ...rest } = s;
+  const out = { ...rest, tgLinked: !!tgChat, pushCount: (push || []).length };
   if (viewer.role === 'boshqaruv' || viewer.id === s.id) out.tgCode = tgCode;
   return out;
 }
@@ -513,7 +582,11 @@ function stateFor(u) {
   const closed = db.tasks.filter(t => !OPEN.includes(t.status)).slice(-100);
   return {
     serverTime: Date.now(), me: pub(u, u),
-    settings: { startLimit: st.startLimit, cleanLimit: st.cleanLimit, inspectLimit: st.inspectLimit, botUsername: st.botUsername, hasToken: !!st.telegramToken, tgError, ...(admin ? { telegramToken: st.telegramToken, lanUrls: lanUrls() } : {}) },
+    settings: {
+      startLimit: st.startLimit, cleanLimit: st.cleanLimit, inspectLimit: st.inspectLimit, botUsername: st.botUsername, hasToken: !!st.telegramToken, tgError,
+      vapidPublic: st.vapid ? st.vapid.publicKey : null, publicUrl,
+      ...(admin ? { telegramToken: st.telegramToken, lanUrls: lanUrls() } : {})
+    },
     staff: db.staff.map(s => pub(s, u)), floors: db.floors, rooms: db.rooms,
     tasks: [...db.tasks.filter(t => OPEN.includes(t.status)), ...closed],
     history: (u.role === 'tozalovchi' ? db.history.filter(h => h.cleanerId === u.id) : db.history).slice(-500),
@@ -540,6 +613,11 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
       return res.end(fs.readFileSync(INDEX_FILE));
+    }
+    if (req.method === 'GET' && STATIC[url.pathname]) {
+      const [file, type] = STATIC[url.pathname];
+      res.writeHead(200, { 'content-type': type, 'cache-control': 'no-cache' });
+      return res.end(fs.readFileSync(path.join(__dirname, file)));
     }
     if (url.pathname === '/api/login' && req.method === 'POST') {
       const b = await readBody(req);
